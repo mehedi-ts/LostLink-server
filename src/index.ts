@@ -194,6 +194,8 @@ app.get("/", (req: Request, res: Response) => {
   res.send("LostLink Server is running.......");
 });
 
-app.listen(port, () => {
-  console.log(`LostLink Server is running on port ${port}`);
-});
+if (process.env.NODE_ENV !== "production") {
+  app.listen(port, () => {
+    console.log(`LostLink Server is running on port ${port}`);
+  });
+}
