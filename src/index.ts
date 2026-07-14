@@ -72,38 +72,95 @@ async function run() {
 
     // ---------- Routes ----------
 
-    app.get("/api/items", async (req: Request, res: Response) => {
-      try {
-        const { search, category, itemType, status, page = "1", limit = "12" } = req.query;
+app.get("/api/items", async (req: Request, res: Response) => {
+  try {
+    const {
+      search,
+      category,
+      itemType,
+      status,
+      location,
+      date,
+      sortBy = "newest",
+      page = "1",
+      limit = "12",
+    } = req.query;
 
-        const matchQuery: Record<string, any> = {};
-        if (search) matchQuery.title = { $regex: search as string, $options: "i" };
-        if (category) matchQuery.category = category;
-        if (itemType) matchQuery.itemType = itemType;
-        if (status) matchQuery.status = status;
+    const matchQuery: Record<string, any> = {};
 
-        const pageNum = Math.max(parseInt(page as string) || 1, 1);
-        const limitNum = Math.max(parseInt(limit as string) || 12, 1);
-        const skip = (pageNum - 1) * limitNum;
+    if (search) {
+      matchQuery.title = {
+        $regex: search as string,
+        $options: "i",
+      };
+    }
 
-        const totalCount = await itemsCollection.countDocuments(matchQuery);
-        const items = await itemsCollection
-          .find(matchQuery)
-          .sort({ createdAt: -1 })
-          .skip(skip)
-          .limit(limitNum)
-          .toArray();
+    if (category) {
+      matchQuery.category = category;
+    }
 
-        res.send({
-          items,
-          totalCount,
-          totalPages: Math.ceil(totalCount / limitNum),
-          currentPage: pageNum,
-        });
-      } catch (error: any) {
-        res.status(500).send({ message: "Failed to fetch items", error: error.message });
-      }
+    // "all" হলে filter করবে না
+    if (itemType && itemType !== "all") {
+      matchQuery.itemType = itemType;
+    }
+
+    // "all" হলে filter করবে না
+    if (status && status !== "all") {
+      matchQuery.status = status;
+    }
+
+    if (location) {
+      matchQuery.location = {
+        $regex: location as string,
+        $options: "i",
+      };
+    }
+
+    if (date) {
+      matchQuery.date = date;
+    }
+
+    const pageNum = Math.max(parseInt(page as string) || 1, 1);
+    const limitNum = Math.max(parseInt(limit as string) || 12, 1);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Sorting
+    let sortOption: Record<string, 1 | -1> = {
+      createdAt: -1, // newest
+    };
+
+    if (sortBy === "oldest") {
+      sortOption = {
+        createdAt: 1,
+      };
+    } else if (sortBy === "updated") {
+      sortOption = {
+        updatedAt: -1,
+      };
+    }
+
+    const totalCount = await itemsCollection.countDocuments(matchQuery);
+
+    const items = await itemsCollection
+      .find(matchQuery)
+      .sort(sortOption)
+      .skip(skip)
+      .limit(limitNum)
+      .toArray();
+
+    res.send({
+      items,
+      totalCount,
+      totalPages: Math.ceil(totalCount / limitNum),
+      currentPage: pageNum,
     });
+  } catch (error: any) {
+    res.status(500).send({
+      message: "Failed to fetch items",
+      error: error.message,
+    });
+  }
+});
 
     app.get("/api/items/:id", async (req: Request, res: Response) => {
       try {
